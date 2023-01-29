@@ -75,7 +75,9 @@ _start :
         
         string file_name = it->getName() + ".S"; 
         ofstream file(file_name);
-
+        file << _assembly; 
+        
+        
         switch(it->getType()){
             case R_type :
                 for (int rd = 0; rd < 32; rd++){
@@ -104,6 +106,8 @@ _start :
                 }
                 break;
         }
+        file << "   " << "j _good" ;
+        file.close();
     }
 
 }
