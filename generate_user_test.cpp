@@ -20,7 +20,7 @@
     These programm are supposed to be launched after the reset, so cpu 
     should be in user mode
 */
-int main(){
+void priviledge_test(){
     std::map<std::string, int> csr_registers;
 
     // Implemented CSR :
@@ -79,4 +79,36 @@ _start :
         file.close();
         i++;
     }
+}
+
+void test_instruction(std::string instruction_name){
+    std::string file_name = instruction_name + ".S"; 
+    std::ofstream file(file_name);
+           
+    // Generation of the text for the file
+        
+    std::string assembly = R"(
+.section .text
+.global _start
+
+_start :
+)";
+
+    file << assembly; 
+
+    for (int rd = 0; rd < 32; rd++){
+        for (int rs1 = 0; rs1 < 32; rs1++){
+            for (int rs2 = 0; rs2 < 32; rs2++){
+                std::string instruction = instruction_name + " x" + std::to_string(rd)
+                +", x" + std::to_string(rs1) + ", x" + std::to_string(rs2);
+                file << "   " << instruction << std::endl;       
+            }
+        }
+    }
+    file << "   " << "j _good" ;
+    file.close();
+}
+int main(){
+    // priviledge_test();
+    test_instruction("sub");
 }
