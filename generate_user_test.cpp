@@ -3,23 +3,111 @@
 #include <string>
 #include <string_view>
 #include <fstream>
+#include <vector>
+#include <cstdlib>
+#include <ctime>
 #define USER        0b00
-// #define SUPERVISOR  0b01 // not implemented in our architecture
+#define SUPERVISOR  0b01 
 #define MACHINE     0b11
 
 #define NONE        0b00 << 2
 #define READ_ONLY   0b01 << 2
 #define WRITE_ONLY  0b01 << 2
 #define R_W         0b11 << 2
-/*
-    This is a test generator for the CSR
-    priviledge.
-    The map will store every csr implemented in the architecture and
-    the key associated will be the priviledge needed to access it.
 
-    These programm are supposed to be launched after the reset, so cpu 
-    should be in user mode
-*/
+using namespace std;
+
+enum TYPE { R_type, B_type, J_type, MEM_type };
+class Instruction{
+    public:
+        Instruction(string name, int is_immediat, int type);
+        inline int getType()    {return _type ;                          };
+        inline int IsImmediat() {return (_is_immediat == 1) ? 1 : 0 ;    };
+        inline string getName() {return _name ;                          };
+    private:
+    int     _is_immediat;
+    int     _type;
+    string  _name;
+};
+Instruction::Instruction(string name, int is_immediat, int type) :
+_is_immediat(is_immediat),
+_type(type),
+_name(name){
+
+}
+
+class test_generator 
+{
+    public:
+        test_generator(Instruction instruction);
+        test_generator(vector<Instruction> instruction);
+        void build_tests();
+        vector<string>  getInstructions();
+    private:
+        string              _assembly;
+        vector<Instruction> _instructions; 
+};
+
+// Constructor
+test_generator::test_generator(Instruction instruction) :
+_assembly()
+{
+    _instructions.push_back(instruction);
+}
+
+test_generator::test_generator(vector<Instruction> instruction) :
+_assembly(),
+_instructions(instruction)
+{
+    
+}
+
+void test_generator::build_tests(){
+
+    _assembly  = R"(
+.section .text
+.global _start
+
+_start :
+)";
+
+    for(auto it = _instructions.begin(); it != _instructions.end(); it++){
+        
+        string file_name = it->getName() + ".S"; 
+        ofstream file(file_name);
+
+        switch(it->getType()){
+            case R_type :
+                for (int rd = 0; rd < 32; rd++){
+                    for (int rs1 = 0; rs1 < 32; rs1++){
+                        for (int rs2 = 0; rs2 < 32; rs2++){
+                            string instruction_s = it->getName() + " x" + to_string(rd)
+                            +", x" + to_string(rs1) + ", x" + to_string(rs2);
+                            file << "   " << instruction_s << endl;  
+                        }
+                    }
+                }
+                break;
+            case B_type :
+                break;
+            case J_type :
+                break;
+            case MEM_type :
+                for (int rd = 0; rd < 32; rd++){
+                    for (int rs1 = 0; rs1 < 32; rs1++){
+                            // access with rand number multiple of 4
+                            string instruction_s = it->getName() + " x" + to_string(rd)
+                            +", " + to_string(((rand()%4096)/4)*4) + "(x" + to_string(rs1) +")" ;
+
+                            file << "   " << instruction_s << endl;
+                    }
+                }
+                break;
+        }
+    }
+
+}
+
 void priviledge_test(){
     std::map<std::string, int> csr_registers;
 
@@ -109,6 +197,9 @@ _start :
     file.close();
 }
 int main(){
-    // priviledge_test();
-    test_instruction("sub");
+    Instruction add("add", false, R_type);
+    Instruction lw("lw", false, MEM_type);
+    vector<Instruction> v_Instructions = {add, lw};
+    test_generator gen(v_Instructions);
+    gen.build_tests();
 }
