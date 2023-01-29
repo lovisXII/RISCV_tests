@@ -80,6 +80,7 @@ _start :
         
         switch(it->getType()){
             case R_type :
+                if(it->IsImmediat() == false){
                 for (int rd = 0; rd < 32; rd++){
                     for (int rs1 = 0; rs1 < 32; rs1++){
                         for (int rs2 = 0; rs2 < 32; rs2++){
@@ -88,6 +89,7 @@ _start :
                             file << "   " << instruction_s << endl;  
                         }
                     }
+                }
                 }
                 break;
             case B_type :
@@ -201,9 +203,50 @@ _start :
     file.close();
 }
 int main(){
+    Instruction sub("sub", false, R_type);
+    Instruction sll("sll", false, R_type);
+    Instruction slt("slt", false, R_type);
     Instruction add("add", false, R_type);
-    Instruction lw("lw", false, MEM_type);
-    vector<Instruction> v_Instructions = {add, lw};
+    Instruction sltu("sltu", false, R_type);
+    Instruction xor_("xor", false, R_type);
+    Instruction srl("srl", false, R_type);
+    Instruction sra("sra", false, R_type);
+    Instruction or_("or", false, R_type);
+    Instruction and_("and", false, R_type);
+    Instruction addi("addi", true, R_type);
+    Instruction slli("slli", true, R_type);
+    Instruction slti("slti", true, R_type);
+    Instruction sltiu("sltiu", true, R_type);
+    Instruction xori("xori", true, R_type);
+    Instruction srli("srli", true, R_type);
+    Instruction srai("srai", true, R_type);
+    Instruction ori("ori", true, R_type);
+    Instruction andi("andi", true, R_type);
+    Instruction lb("lb", true, MEM_type);
+    Instruction lh("lh", true, MEM_type);
+    Instruction lw("lw", true, MEM_type);
+    Instruction lbu("lbu", true, MEM_type);
+    Instruction lhu("lhu", true, MEM_type);
+    Instruction sb("sb", true, MEM_type);
+    Instruction sh("sh", true, MEM_type);
+    Instruction sw("sw", true, MEM_type);
+    Instruction beq("beq", true, B_type);
+    Instruction bne("bne", true, B_type);
+    Instruction blt("blt", true, B_type);
+    Instruction bge("bge", true, B_type);
+    Instruction bltu("bltu", true, B_type);
+    Instruction bgeu("bgeu", true, B_type);
+    Instruction jal("jal", true, J_type);
+    Instruction jalr("jalr", true, J_type);
+
+    vector<Instruction> v_Instructions = {
+    add, sub, sll, slt, sltu, xor_, srl, sra, or_, and_,
+    addi, slli, slti, sltiu, xori, srli, srai, ori, andi,
+    lb, lh, lw, lbu, lhu, sb, sh, sw,
+    beq, bne, blt, bge, bltu, bgeu,
+    jal, jalr
+    };
+
     test_generator gen(v_Instructions);
     gen.build_tests();
 }
