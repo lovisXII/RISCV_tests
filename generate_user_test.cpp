@@ -6,6 +6,12 @@
 #include <vector>
 #include <cstdlib>
 #include <ctime>
+#include <algorithm>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
 #define USER        0b00
 #define SUPERVISOR  0b01 
 #define MACHINE     0b11
@@ -18,6 +24,89 @@
 using namespace std;
 
 enum TYPE { R_type, B_type, J_type, MEM_type };
+
+
+/*------------------------------------------------------------
+                    START UP FUNCTION
+--------------------------------------------------------------*/
+void start_logo(){
+    cout << R"(
+ ________  ___  ___      ___ _______   ________         
+|\   __  \|\  \|\  \    /  /|\  ___ \ |\   __  \        
+\ \  \|\  \ \  \ \  \  /  / | \   __/|\ \  \|\  \       
+ \ \   _  _\ \  \ \  \/  / / \ \  \_|/_\ \   _  _\      
+  \ \  \\  \\ \  \ \    / /   \ \  \_|\ \ \  \\  \|     
+   \ \__\\ _\\ \__\ \__/ /     \ \_______\ \__\\ _\     
+    \|__|\|__|\|__|\|__|/       \|_______|\|__|\|__|    
+                                                        
+                                                        
+                                                        
+ _________  _______   ________  _________               
+|\___   ___\\  ___ \ |\   ____\|\___   ___\             
+\|___ \  \_\ \   __/|\ \  \___|\|___ \  \_|             
+     \ \  \ \ \  \_|/_\ \_____  \   \ \  \              
+      \ \  \ \ \  \_|\ \|____|\  \   \ \  \             
+       \ \__\ \ \_______\____\_\  \   \ \__\            
+        \|__|  \|_______|\_________\   \|__|            
+                        \|_________|                                                          
+                                                    )"<< endl;
+}
+bool print_menu(){
+    string is_easy;
+    cout << R"(
+        Welcome to RiVer Test !!
+        This framework allows you to generate assembly test for your architecture.
+        If you're using a testbench to test your architecture it will need to parse .s files 
+        and to detect _bad and _good symbols !
+    )" << endl;
+    cout << R"(
+        Please enter the following commands :
+
+        A : simple test (10 instructions per test)
+        B : Hard test (several thousands of instructions !
+        )" << endl;
+    while(is_easy != "A" && is_easy != "B"){
+        cin >> is_easy;
+        transform(is_easy.begin(), is_easy.end(),is_easy.begin(), ::toupper);
+    }
+    return (is_easy == "A") ?  true : false;
+
+}
+
+bool start(){
+    start_logo();
+    bool is_easy = print_menu();
+    return is_easy;
+}
+
+/*------------------------------------------------------------
+                    USEFULL FUNCTION
+--------------------------------------------------------------*/
+
+void create_directory(string name){
+    int check;
+    check = mkdir(name.c_str(),0777);
+    if(check == -1 && errno != EEXIST) {
+        cerr << "Unable to create directory " << name << endl;
+        exit(1);
+    }
+}
+string filename(string name, int number){
+    return name + "/" + name + "_" + to_string(number) + ".S";
+}
+
+void open_checked(ofstream& file, string file_name){
+    file.open(file_name);
+    if(!file.is_open())
+    {
+        cerr << "Error file " << file_name << " impossible to open" << endl;
+        exit(1);
+    }
+}
+/*------------------------------------------------------------
+                    INSTRUCTION CLASS
+--------------------------------------------------------------*/
+
 class Instruction{
     public:
         Instruction(string name, int is_immediat, int type);
@@ -36,27 +125,34 @@ _name(name){
 
 }
 
+/*------------------------------------------------------------
+                    TEST_GENERATOR CLASS
+--------------------------------------------------------------*/
+
 class test_generator 
 {
     public:
-        test_generator(Instruction instruction);
-        test_generator(vector<Instruction> instruction);
+        test_generator(Instruction instruction, bool is_easy);
+        test_generator(vector<Instruction> instruction, bool is_easy);
         void build_tests();
         vector<string>  getInstructions();
     private:
         string              _assembly;
         vector<Instruction> _instructions; 
+        bool                _is_easy;
 };
 
 // Constructor
-test_generator::test_generator(Instruction instruction) :
-_assembly()
+test_generator::test_generator(Instruction instruction, bool is_easy) :
+_assembly(),
+_is_easy(is_easy)
 {
     _instructions.push_back(instruction);
 }
 
-test_generator::test_generator(vector<Instruction> instruction) :
+test_generator::test_generator(vector<Instruction> instruction, bool is_easy) :
 _assembly(),
+_is_easy(is_easy),
 _instructions(instruction)
 {
     
@@ -72,24 +168,81 @@ _start :
 )";
 
     for(auto it = _instructions.begin(); it != _instructions.end(); it++){
-        
-        string file_name = it->getName() + ".S"; 
-        ofstream file(file_name);
-        file << _assembly; 
-        
-        
+    
+        int number_of_tests = 0;
+        /*
+            Each test will be made like this :
+            li rs1, random_value
+            li rs2, random value
+            rd = operation(rs1, rs2) // for example add rd, rs1, rs2
+            li test_register, operation(rs1,rs2)
+            bne test_register, rd, _bad     
+
+            The register used to test the value of the 
+            operation will always be x23, if x23 is used as rd, 
+            it will be 24
+        */
+       ofstream file;
+       int number_of_file = 0;
         switch(it->getType()){
             case R_type :
                 if(it->IsImmediat() == false){
-                for (int rd = 0; rd < 32; rd++){
-                    for (int rs1 = 0; rs1 < 32; rs1++){
-                        for (int rs2 = 0; rs2 < 32; rs2++){
-                            string instruction_s = it->getName() + " x" + to_string(rd)
-                            +", x" + to_string(rs1) + ", x" + to_string(rs2);
-                            file << "   " << instruction_s << endl;  
+                    for (int rd = 0; rd < 32; rd++){
+                        for (int rs1 = 0; rs1 < 32; rs1++){
+                            for (int rs2 = 0; rs2 < 32; rs2++){
+                                if(number_of_tests % 10 == 0){
+                                    file.close();
+                                    create_directory(it->getName());
+                                    string file_name = filename(it->getName(),number_of_file);
+                                    open_checked(file, file_name);
+                                    file << _assembly; 
+                                    number_of_file++;
+                                }
+                                file << "   " << "test_" << number_of_tests << " :"<< endl;
+
+                                int value_rs1 = rand() % 4096; // 2^12, should be enough
+                                int value_rs2 = rand() % 4096;
+
+                                string instruction1_s = "li x" + to_string(rs1) + ", " 
+                                + to_string(value_rs1); // li rs1, random_value
+                                
+                                string instruction2_s = "li x" + to_string(rs2) + ", " 
+                                + to_string(value_rs1); // li rs2, random_value
+                                
+                                string instruction3_s = it->getName() + " x" + to_string(rd)
+                                +", x" + to_string(rs1) 
+                                + ", x" + to_string(rs2); // operation rd, rs1, rs2
+                                
+                                int result = value_rs1 + value_rs2;
+                                file << "       " << instruction1_s << endl; 
+                                file << "       " << instruction2_s << endl; 
+                                file << "       " << instruction3_s << endl;
+                   
+                                int test_register;
+                                if(rd != 0){
+                                    if(rd != 23){
+                                        file << "       " << "li x23," << result << endl;
+                                        test_register = 23;
+                                    }
+                                    else {   
+                                        file << "       " << "li x24," << result << endl;
+                                        test_register = 24;
+                                    }
+                                    file << "       " << "bne x" << to_string(rd) 
+                                    << ", x" << to_string(test_register) << endl;
+                                }
+                                else{
+                                    file << "       " << "li x23, 0" << endl;
+                                    file << "       " << "bne x" << to_string(rd) 
+                                    << ", x23" << endl;        
+                                }
+                                number_of_tests++;
+                            }
                         }
                     }
                 }
+                else{
+
                 }
                 break;
             case B_type :
@@ -202,51 +355,54 @@ _start :
     file << "   " << "j _good" ;
     file.close();
 }
+
+
 int main(){
-    Instruction sub("sub", false, R_type);
-    Instruction sll("sll", false, R_type);
-    Instruction slt("slt", false, R_type);
+    bool is_easy = start();
+    // Instruction sub("sub", false, R_type);
+    // Instruction sll("sll", false, R_type);
+    // Instruction slt("slt", false, R_type);
     Instruction add("add", false, R_type);
-    Instruction sltu("sltu", false, R_type);
-    Instruction xor_("xor", false, R_type);
-    Instruction srl("srl", false, R_type);
-    Instruction sra("sra", false, R_type);
-    Instruction or_("or", false, R_type);
-    Instruction and_("and", false, R_type);
-    Instruction addi("addi", true, R_type);
-    Instruction slli("slli", true, R_type);
-    Instruction slti("slti", true, R_type);
-    Instruction sltiu("sltiu", true, R_type);
-    Instruction xori("xori", true, R_type);
-    Instruction srli("srli", true, R_type);
-    Instruction srai("srai", true, R_type);
-    Instruction ori("ori", true, R_type);
-    Instruction andi("andi", true, R_type);
-    Instruction lb("lb", true, MEM_type);
-    Instruction lh("lh", true, MEM_type);
-    Instruction lw("lw", true, MEM_type);
-    Instruction lbu("lbu", true, MEM_type);
-    Instruction lhu("lhu", true, MEM_type);
-    Instruction sb("sb", true, MEM_type);
-    Instruction sh("sh", true, MEM_type);
-    Instruction sw("sw", true, MEM_type);
-    Instruction beq("beq", true, B_type);
-    Instruction bne("bne", true, B_type);
-    Instruction blt("blt", true, B_type);
-    Instruction bge("bge", true, B_type);
-    Instruction bltu("bltu", true, B_type);
-    Instruction bgeu("bgeu", true, B_type);
-    Instruction jal("jal", true, J_type);
-    Instruction jalr("jalr", true, J_type);
+    // Instruction sltu("sltu", false, R_type);
+    // Instruction xor_("xor", false, R_type);
+    // Instruction srl("srl", false, R_type);
+    // Instruction sra("sra", false, R_type);
+    // Instruction or_("or", false, R_type);
+    // Instruction and_("and", false, R_type);
+    // Instruction addi("addi", true, R_type);
+    // Instruction slli("slli", true, R_type);
+    // Instruction slti("slti", true, R_type);
+    // Instruction sltiu("sltiu", true, R_type);
+    // Instruction xori("xori", true, R_type);
+    // Instruction srli("srli", true, R_type);
+    // Instruction srai("srai", true, R_type);
+    // Instruction ori("ori", true, R_type);
+    // Instruction andi("andi", true, R_type);
+    // Instruction lb("lb", true, MEM_type);
+    // Instruction lh("lh", true, MEM_type);
+    // Instruction lw("lw", true, MEM_type);
+    // Instruction lbu("lbu", true, MEM_type);
+    // Instruction lhu("lhu", true, MEM_type);
+    // Instruction sb("sb", true, MEM_type);
+    // Instruction sh("sh", true, MEM_type);
+    // Instruction sw("sw", true, MEM_type);
+    // Instruction beq("beq", true, B_type);
+    // Instruction bne("bne", true, B_type);
+    // Instruction blt("blt", true, B_type);
+    // Instruction bge("bge", true, B_type);
+    // Instruction bltu("bltu", true, B_type);
+    // Instruction bgeu("bgeu", true, B_type);
+    // Instruction jal("jal", true, J_type);
+    // Instruction jalr("jalr", true, J_type);
 
-    vector<Instruction> v_Instructions = {
-    add, sub, sll, slt, sltu, xor_, srl, sra, or_, and_,
-    addi, slli, slti, sltiu, xori, srli, srai, ori, andi,
-    lb, lh, lw, lbu, lhu, sb, sh, sw,
-    beq, bne, blt, bge, bltu, bgeu,
-    jal, jalr
-    };
-
-    test_generator gen(v_Instructions);
+    // vector<Instruction> v_Instructions = {
+    // add, sub, sll, slt, sltu, xor_, srl, sra, or_, and_,
+    // addi, slli, slti, sltiu, xori, srli, srai, ori, andi,
+    // lb, lh, lw, lbu, lhu, sb, sh, sw,
+    // beq, bne, blt, bge, bltu, bgeu,
+    // jal, jalr
+    // };
+    vector<Instruction> v_Instructions = {add};
+    test_generator gen(v_Instructions, is_easy);
     gen.build_tests();
 }
