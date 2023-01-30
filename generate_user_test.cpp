@@ -23,6 +23,7 @@
 
 using namespace std;
 
+int number_test_per_file = 10;
 enum TYPE { R_type, B_type, J_type, MEM_type };
 
 
@@ -73,9 +74,25 @@ bool print_menu(){
 
 }
 
+void test_per_file(){
+    cout << R"(
+        Enter how much test you want per file, minimum is 1 :
+    )" << endl;
+    int test = 0;
+    while(test == 0){
+        cin >> test;
+        if(test <= 0)
+        {
+            test == 0;
+        }
+    }
+    number_test_per_file = test;
+}
+
 bool start(){
     start_logo();
     bool is_easy = print_menu();
+    test_per_file();
     return is_easy;
 }
 
@@ -102,6 +119,35 @@ void open_checked(ofstream& file, string file_name){
         cerr << "Error file " << file_name << " impossible to open" << endl;
         exit(1);
     }
+}
+
+int operation(string instruction, int op1, int op2) {
+  int result;
+  if (instruction == "add") {
+    result = op1 + op2;
+  } else if (instruction == "sub") {
+    result = op1 - op2;
+  } else if (instruction == "sll") {
+    result = op1 << op2;
+  } else if (instruction == "slt") {
+    result = (op1 < op2) ? 1 : 0;
+  } else if (instruction == "sltu") {
+    result = (unsigned int)op1 < (unsigned int)op2 ? 1 : 0;
+  } else if (instruction == "xor") {
+    result = op1 ^ op2;
+  } else if (instruction == "srl") {
+    result = op1 >> op2;
+  } else if (instruction == "sra") {
+    result = op1 >> op2;
+  } else if (instruction == "or") {
+    result = op1 | op2;
+  } else if (instruction == "and") {
+    result = op1 & op2;
+  } else {
+    cout << "Invalid instruction" << endl;
+    return -1;
+  }
+  return result;
 }
 /*------------------------------------------------------------
                     INSTRUCTION CLASS
@@ -171,16 +217,19 @@ _start :
     
         int number_of_tests = 0;
         /*
-            Each test will be made like this :
-            li rs1, random_value
-            li rs2, random value
-            rd = operation(rs1, rs2) // for example add rd, rs1, rs2
-            li test_register, operation(rs1,rs2)
-            bne test_register, rd, _bad     
+            * Each test will be made like this :
+                li rs1, random_value
+                li rs2, random value
+                rd = operation(rs1, rs2) // for example add rd, rs1, rs2
+                li test_register, operation(rs1,rs2)
+                bne test_register, rd, _bad     
 
-            The register used to test the value of the 
-            operation will always be x23, if x23 is used as rd, 
-            it will be 24
+            * The register used to test the value of the 
+                operation will always be x23, if x23 is used as rd, 
+                it will be 24.
+
+            * Each test will be created in a directory named according to the instruction.
+            * Each time a new file is created, the old one must be closed and a j_good must cloture the file.
         */
        ofstream file;
        int number_of_file = 0;
@@ -188,16 +237,25 @@ _start :
             case R_type :
                 if(it->IsImmediat() == false){
                     for (int rd = 0; rd < 32; rd++){
-                        for (int rs1 = 0; rs1 < 32; rs1++){
-                            for (int rs2 = 0; rs2 < 32; rs2++){
-                                if(number_of_tests % 10 == 0){
-                                    file.close();
+                        for(int rs1 = 0; rs1 < 32; rs1 ++){
+                            for(int rs2 = 0; rs2 < 32; rs2 ++)
+                            {
+                                // FILE NAME GESTION
+                                if(number_of_tests % number_test_per_file == 0){
+                                    if(number_of_file != 0){
+                                        file << "   " << "_exit :" << endl;
+                                        file << "       " << "j _good"<< endl;
+                                        file.close();
+                                    }
+
                                     create_directory(it->getName());
                                     string file_name = filename(it->getName(),number_of_file);
                                     open_checked(file, file_name);
                                     file << _assembly; 
                                     number_of_file++;
                                 }
+                                // END OF FILE NAME GESTION
+                                
                                 file << "   " << "test_" << number_of_tests << " :"<< endl;
 
                                 int value_rs1 = rand() % 4096; // 2^12, should be enough
@@ -213,11 +271,11 @@ _start :
                                 +", x" + to_string(rs1) 
                                 + ", x" + to_string(rs2); // operation rd, rs1, rs2
                                 
-                                int result = value_rs1 + value_rs2;
+                                int result = operation(it->getName(), value_rs1, value_rs2);
                                 file << "       " << instruction1_s << endl; 
                                 file << "       " << instruction2_s << endl; 
                                 file << "       " << instruction3_s << endl;
-                   
+                    
                                 int test_register;
                                 if(rd != 0){
                                     if(rd != 23){
@@ -240,6 +298,7 @@ _start :
                             }
                         }
                     }
+                       
                 }
                 else{
 
@@ -357,6 +416,10 @@ _start :
 }
 
 
+/*------------------------------------------------------------
+                    MAIN, GENERATES TEST FILES
+--------------------------------------------------------------*/
+
 int main(){
     bool is_easy = start();
     // Instruction sub("sub", false, R_type);
@@ -367,7 +430,7 @@ int main(){
     // Instruction xor_("xor", false, R_type);
     // Instruction srl("srl", false, R_type);
     // Instruction sra("sra", false, R_type);
-    // Instruction or_("or", false, R_type);
+    Instruction or_("or", false, R_type);
     // Instruction and_("and", false, R_type);
     // Instruction addi("addi", true, R_type);
     // Instruction slli("slli", true, R_type);
@@ -402,7 +465,7 @@ int main(){
     // beq, bne, blt, bge, bltu, bgeu,
     // jal, jalr
     // };
-    vector<Instruction> v_Instructions = {add};
+    vector<Instruction> v_Instructions = {add, or_};
     test_generator gen(v_Instructions, is_easy);
     gen.build_tests();
 }
