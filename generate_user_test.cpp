@@ -63,8 +63,8 @@ bool print_menu(){
     cout << R"(
         Please enter the following commands :
 
-        A : simple test (10 instructions per test)
-        B : Hard test (several thousands of instructions !
+        A : Just a few tests
+        B : Maximum number of test per instruction (32768 per instruction)
         )" << endl;
     while(is_easy != "A" && is_easy != "B"){
         cin >> is_easy;
@@ -122,26 +122,26 @@ void open_checked(ofstream& file, string file_name){
 }
 
 int operation(string instruction, int op1, int op2) {
-  int result;
-  if (instruction == "add") {
+  int result = 0;
+  if (instruction == "add" || instruction == "addi") {
     result = op1 + op2;
   } else if (instruction == "sub") {
     result = op1 - op2;
-  } else if (instruction == "sll") {
+  } else if (instruction == "sll" || instruction == "slli") {
     result = op1 << op2;
-  } else if (instruction == "slt") {
+  } else if (instruction == "slt" || instruction == "slti") {
     result = (op1 < op2) ? 1 : 0;
   } else if (instruction == "sltu") {
     result = (unsigned int)op1 < (unsigned int)op2 ? 1 : 0;
-  } else if (instruction == "xor") {
+  } else if (instruction == "xor" || instruction == "xori") {
     result = op1 ^ op2;
-  } else if (instruction == "srl") {
+  } else if (instruction == "srl" || instruction == "srli") {
     result = op1 >> op2;
   } else if (instruction == "sra") {
     result = op1 >> op2;
-  } else if (instruction == "or") {
+  } else if (instruction == "or" || instruction == "ori") {
     result = op1 | op2;
-  } else if (instruction == "and") {
+  } else if (instruction == "and" || instruction == "andi") {
     result = op1 & op2;
   } else {
     cout << "Invalid instruction" << endl;
@@ -149,6 +149,8 @@ int operation(string instruction, int op1, int op2) {
   }
   return result;
 }
+
+
 /*------------------------------------------------------------
                     INSTRUCTION CLASS
 --------------------------------------------------------------*/
@@ -255,7 +257,7 @@ _start :
                                     number_of_file++;
                                 }
                                 // END OF FILE NAME GESTION
-                                
+
                                 file << "   " << "test_" << number_of_tests << " :"<< endl;
 
                                 int value_rs1 = rand() % 4096; // 2^12, should be enough
@@ -265,12 +267,12 @@ _start :
                                 + to_string(value_rs1); // li rs1, random_value
                                 
                                 string instruction2_s = "li x" + to_string(rs2) + ", " 
-                                + to_string(value_rs1); // li rs2, random_value
+                                + to_string(value_rs2); // li rs2, random_value
                                 
                                 string instruction3_s = it->getName() + " x" + to_string(rd)
                                 +", x" + to_string(rs1) 
-                                + ", x" + to_string(rs2); // operation rd, rs1, rs2
-                                
+                                + ", x" + to_string(rs2); // operation rd, rs1, rs2*
+
                                 int result = operation(it->getName(), value_rs1, value_rs2);
                                 file << "       " << instruction1_s << endl; 
                                 file << "       " << instruction2_s << endl; 
@@ -287,12 +289,12 @@ _start :
                                         test_register = 24;
                                     }
                                     file << "       " << "bne x" << to_string(rd) 
-                                    << ", x" << to_string(test_register) << endl;
+                                    << ", x" << to_string(test_register) << ", _bad" << endl;
                                 }
                                 else{
                                     file << "       " << "li x23, 0" << endl;
                                     file << "       " << "bne x" << to_string(rd) 
-                                    << ", x23" << endl;        
+                                    << ", x23" << ", _bad" << endl;        
                                 }
                                 number_of_tests++;
                             }
@@ -301,7 +303,63 @@ _start :
                        
                 }
                 else{
+                    for (int rd = 0; rd < 32; rd++){
+                        for(int rs1 = 0; rs1 < 32; rs1 ++){
+                            for(int rs2 = 0; rs2 < 32; rs2 ++)
+                            {
+                                // FILE NAME GESTION
+                                if(number_of_tests % number_test_per_file == 0){
+                                    if(number_of_file != 0){
+                                        file << "   " << "_exit :" << endl;
+                                        file << "       " << "j _good"<< endl;
+                                        file.close();
+                                    }
 
+                                    create_directory(it->getName());
+                                    string file_name = filename(it->getName(),number_of_file);
+                                    open_checked(file, file_name);
+                                    file << _assembly; 
+                                    number_of_file++;
+                                }
+                                // END OF FILE NAME GESTION
+
+                                file << "   " << "test_" << number_of_tests << " :"<< endl;
+
+                                int value_rs1 = rand() % 4096; // 2^12, should be enough
+                                int immediat_value = rand() % 4096;
+                                string instruction1_s = "li x" + to_string(rs1) + ", " 
+                                + to_string(value_rs1); // li rs1, random_value
+                                
+                                string instruction3_s = it->getName() + " x" + to_string(rd)
+                                +", x" + to_string(rs1) 
+                                + ", " + to_string(immediat_value) ; // operation rd, rs1, rs2*
+
+                                int result = operation(it->getName(), value_rs1, immediat_value);
+                                file << "       " << instruction1_s << endl; 
+                                file << "       " << instruction3_s << endl;
+                    
+                                int test_register;
+                                if(rd != 0){
+                                    if(rd != 23){
+                                        file << "       " << "li x23," << result << endl;
+                                        test_register = 23;
+                                    }
+                                    else {   
+                                        file << "       " << "li x24," << result << endl;
+                                        test_register = 24;
+                                    }
+                                    file << "       " << "bne x" << to_string(rd) 
+                                    << ", x" << to_string(test_register) << ", _bad" << endl;
+                                }
+                                else{
+                                    file << "       " << "li x23, 0" << endl;
+                                    file << "       " << "bne x" << to_string(rd) 
+                                    << ", x23" << ", _bad" << endl;        
+                                }
+                                number_of_tests++;
+                            }
+                        }
+                    }
                 }
                 break;
             case B_type :
@@ -422,50 +480,50 @@ _start :
 
 int main(){
     bool is_easy = start();
-    // Instruction sub("sub", false, R_type);
-    // Instruction sll("sll", false, R_type);
-    // Instruction slt("slt", false, R_type);
+    Instruction sub("sub", false, R_type);
+    Instruction sll("sll", false, R_type);
+    Instruction slt("slt", false, R_type);
     Instruction add("add", false, R_type);
-    // Instruction sltu("sltu", false, R_type);
-    // Instruction xor_("xor", false, R_type);
-    // Instruction srl("srl", false, R_type);
-    // Instruction sra("sra", false, R_type);
+    Instruction sltu("sltu", false, R_type);
+    Instruction xor_("xor", false, R_type);
+    Instruction srl("srl", false, R_type);
+    Instruction sra("sra", false, R_type);
     Instruction or_("or", false, R_type);
-    // Instruction and_("and", false, R_type);
-    // Instruction addi("addi", true, R_type);
-    // Instruction slli("slli", true, R_type);
-    // Instruction slti("slti", true, R_type);
-    // Instruction sltiu("sltiu", true, R_type);
-    // Instruction xori("xori", true, R_type);
-    // Instruction srli("srli", true, R_type);
-    // Instruction srai("srai", true, R_type);
-    // Instruction ori("ori", true, R_type);
-    // Instruction andi("andi", true, R_type);
-    // Instruction lb("lb", true, MEM_type);
-    // Instruction lh("lh", true, MEM_type);
-    // Instruction lw("lw", true, MEM_type);
-    // Instruction lbu("lbu", true, MEM_type);
-    // Instruction lhu("lhu", true, MEM_type);
-    // Instruction sb("sb", true, MEM_type);
-    // Instruction sh("sh", true, MEM_type);
-    // Instruction sw("sw", true, MEM_type);
-    // Instruction beq("beq", true, B_type);
-    // Instruction bne("bne", true, B_type);
-    // Instruction blt("blt", true, B_type);
-    // Instruction bge("bge", true, B_type);
-    // Instruction bltu("bltu", true, B_type);
-    // Instruction bgeu("bgeu", true, B_type);
-    // Instruction jal("jal", true, J_type);
-    // Instruction jalr("jalr", true, J_type);
+    Instruction and_("and", false, R_type);
+    Instruction addi("addi", true, R_type);
+    Instruction slli("slli", true, R_type);
+    Instruction slti("slti", true, R_type);
+    Instruction sltiu("sltiu", true, R_type);
+    Instruction xori("xori", true, R_type);
+    Instruction srli("srli", true, R_type);
+    Instruction srai("srai", true, R_type);
+    Instruction ori("ori", true, R_type);
+    Instruction andi("andi", true, R_type);
+    Instruction lb("lb", true, MEM_type);
+    Instruction lh("lh", true, MEM_type);
+    Instruction lw("lw", true, MEM_type);
+    Instruction lbu("lbu", true, MEM_type);
+    Instruction lhu("lhu", true, MEM_type);
+    Instruction sb("sb", true, MEM_type);
+    Instruction sh("sh", true, MEM_type);
+    Instruction sw("sw", true, MEM_type);
+    Instruction beq("beq", true, B_type);
+    Instruction bne("bne", true, B_type);
+    Instruction blt("blt", true, B_type);
+    Instruction bge("bge", true, B_type);
+    Instruction bltu("bltu", true, B_type);
+    Instruction bgeu("bgeu", true, B_type);
+    Instruction jal("jal", true, J_type);
+    Instruction jalr("jalr", true, J_type);
 
-    // vector<Instruction> v_Instructions = {
-    // add, sub, sll, slt, sltu, xor_, srl, sra, or_, and_,
-    // addi, slli, slti, sltiu, xori, srli, srai, ori, andi,
-    // lb, lh, lw, lbu, lhu, sb, sh, sw,
-    // beq, bne, blt, bge, bltu, bgeu,
-    // jal, jalr
-    // };
-    vector<Instruction> v_Instructions = {add, or_};
+    vector<Instruction> v_Instructions = {
+    add, sub, sll, slt, sltu, xor_, srl, sra, or_, and_,
+    addi, slli, slti, sltiu, xori, srli, srai, ori, andi,
+    lb, lh, lw, lbu, lhu, sb, sh, sw,
+    beq, bne, blt, bge, bltu, bgeu,
+    jal, jalr
+    };
+    // vector<Instruction> v_Instructions = {addi};
     test_generator gen(v_Instructions, is_easy);
     gen.build_tests();
 }
