@@ -1,1 +1,7 @@
-Need to add bne after each instruction to check wether the result is good or no
+* Adding missing instruction
+
+* Reducing number of file
+
+* Enableling the small set of test
+
+* To much instruction in a file seems to create conflict
