@@ -290,13 +290,17 @@ _start :
                                 int value_rs2 = rand() % 4096;
 
                                 int result;
-                                if(rs1 == 0)
+                                if(rs1 == 0 && rs2 != 0)
                                     result = operation(it->getName(), 0, value_rs2);
-                                else if(rs2 == 0)
+                                else if(rs1 != 0 && rs2 == 0)
                                     result = operation(it->getName(), value_rs1, 0);
+                                else if(rs1 == 0 && rs2 == 0)
+                                    result = operation(it->getName(), 0, 0);
+                                else if(rs1 == rs2)
+                                    result = operation(it->getName(), value_rs2, value_rs2);
                                 else
                                     result = operation(it->getName(), value_rs1, value_rs2);
-                                    
+
                                 file << "       " << li.toString(rs1,value_rs1,0,"") << endl; 
                                 file << "       " << li.toString(rs2,value_rs2,0,"") << endl; 
                                 file << "       " << it->toString(rd,rs1,rs2,"") << endl;
