@@ -161,6 +161,7 @@ class Instruction{
         inline int getType()    {return _type ;                          };
         inline int IsImmediat() {return (_is_immediat == 1) ? 1 : 0 ;    };
         inline string getName() {return _name ;                          };
+        string toString(int rd, int rs1, int rs2, string label);
     private:
     int     _is_immediat;
     int     _type;
@@ -170,6 +171,28 @@ Instruction::Instruction(string name, int is_immediat, int type) :
 _is_immediat(is_immediat),
 _type(type),
 _name(name){
+
+}
+string Instruction::toString(int rd, int rs1, int rs2, string label)
+{
+    if(_type == R_type && _is_immediat == false){
+        return _name + " x" + to_string(rd)
+        +", x" + to_string(rs1) 
+        + ", x" + to_string(rs2); // operation rd, rs1, rs2*
+
+    }
+    else if(_type == R_type && _is_immediat == true && _name != "li"){
+        return _name + " x" + to_string(rd)
+        +", x" + to_string(rs1) 
+        + ", " + to_string(rs2) ; // operation rd, rs1, rs2*
+    }
+    else if(_name == "li"){
+        return "li x" + to_string(rd) + ", " + to_string(rs1); // li rs1, random_value
+
+    }
+    else if(_type == B_type){
+            return "bne x" + to_string(rs1) + ", x" + to_string(rs2) + ", " + label ;
+    }
 
 }
 
@@ -214,6 +237,9 @@ void test_generator::build_tests(){
 
 _start :
 )";
+    // Instruction needed for the generation :
+    Instruction li  ("li"    , true   , R_type);
+    Instruction bne ("bne"   , false  , B_type);
 
     for(auto it = _instructions.begin(); it != _instructions.end(); it++){
     
@@ -263,39 +289,27 @@ _start :
                                 int value_rs1 = rand() % 4096; // 2^12, should be enough
                                 int value_rs2 = rand() % 4096;
 
-                                string instruction1_s = "li x" + to_string(rs1) + ", " 
-                                + to_string(value_rs1); // li rs1, random_value
-                                
-                                string instruction2_s = "li x" + to_string(rs2) + ", " 
-                                + to_string(value_rs2); // li rs2, random_value
-                                
-                                string instruction3_s = it->getName() + " x" + to_string(rd)
-                                +", x" + to_string(rs1) 
-                                + ", x" + to_string(rs2); // operation rd, rs1, rs2*
-
-                                int result = operation(it->getName(), value_rs1, value_rs2);
-                                file << "       " << instruction1_s << endl; 
-                                file << "       " << instruction2_s << endl; 
-                                file << "       " << instruction3_s << endl;
+                                int result;
+                                if(rs1 == 0)
+                                    result = operation(it->getName(), 0, value_rs2);
+                                else if(rs2 == 0)
+                                    result = operation(it->getName(), value_rs1, 0);
+                                else
+                                    result = operation(it->getName(), value_rs1, value_rs2);
+                                    
+                                file << "       " << li.toString(rs1,value_rs1,0,"") << endl; 
+                                file << "       " << li.toString(rs2,value_rs2,0,"") << endl; 
+                                file << "       " << it->toString(rd,rs1,rs2,"") << endl;
                     
-                                int test_register;
-                                if(rd != 0){
-                                    if(rd != 23){
-                                        file << "       " << "li x23," << result << endl;
-                                        test_register = 23;
-                                    }
-                                    else {   
-                                        file << "       " << "li x24," << result << endl;
-                                        test_register = 24;
-                                    }
-                                    file << "       " << "bne x" << to_string(rd) 
-                                    << ", x" << to_string(test_register) << ", _bad" << endl;
-                                }
-                                else{
-                                    file << "       " << "li x23, 0" << endl;
-                                    file << "       " << "bne x" << to_string(rd) 
-                                    << ", x23" << ", _bad" << endl;        
-                                }
+                                int test_register = 23;
+                                if(rd == 23)
+                                    test_register = 24;
+                                if(rd == 0)
+                                    file << "       " << li.toString(test_register, 0, 0, "") << endl;
+                                else
+                                    file << "       " << li.toString(test_register, result, 0, "") << endl;
+                                
+                                file << "       " << bne.toString(0,rd,test_register,"_bad") << endl;
                                 number_of_tests++;
                             }
                         }
