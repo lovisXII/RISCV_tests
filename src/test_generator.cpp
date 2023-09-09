@@ -148,10 +148,14 @@ _start :
        int number_of_file = 0;
        // This allow to randomise the combinaison of registers
        random_device rd_seed;
-       mt19937 g(rd_seed());
-       shuffle(rd_vec.begin() , rd_vec.end(), g);
-       shuffle(rs1_vec.begin(), rs1_vec.end(), g);
-       shuffle(rs2_vec.begin(), rs2_vec.end(), g);
+       random_device rs1_seed;
+       random_device rs2_seed;
+       mt19937 rd_mt (rd_seed());
+       mt19937 rs1_mt(rs1_seed());
+       mt19937 rs2_mt(rs2_seed());
+       shuffle(rd_vec.begin(),  rd_vec.end(),  rd_mt);
+       shuffle(rs1_vec.begin(), rs1_vec.end(), rs1_mt);
+       shuffle(rs2_vec.begin(), rs2_vec.end(), rs2_mt);
 
         switch(it->getType()){
             case R_type :
@@ -178,10 +182,10 @@ _start :
                                     #ifdef DEBUG
                                     cout << "file name is : "<< file_name << endl;
                                     #endif
+                                    if (number_of_file == _max_test) goto end_loops;
                                     open_checked(file, file_name);
                                     file << _assembly;
                                     number_of_file++;
-                                    if (number_of_file == _max_test) goto end_loops;
                                 }
                                 // END OF FILE NAME GESTION
 
@@ -235,10 +239,10 @@ _start :
                                     }
                                     create_directory(_path, it->getName());
                                     string file_name = filename(_path, it->getName(),number_of_file);
+                                    if (number_of_file == _max_test) goto end_loops;
                                     open_checked(file, file_name);
                                     file << _assembly;
                                     number_of_file++;
-                                    if (number_of_file == _max_test) goto end_loops;
                                 }
                                 // END OF FILE NAME GESTION
 
