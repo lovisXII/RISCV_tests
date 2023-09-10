@@ -126,8 +126,18 @@ _start :
     vector<int> rs1_vec(32);
     vector<int> rs2_vec(32);
     initialise_registers(rd_vec, rs1_vec, rs2_vec);
-    for(auto it = _instructions.begin(); it != _instructions.end(); it++){
+    // This allow to randomise the combinaison of registers
+    random_device rd_seed;
+    random_device rs1_seed;
+    random_device rs2_seed;
+    mt19937 rd_mt (rd_seed());
+    mt19937 rs1_mt(rs1_seed());
+    mt19937 rs2_mt(rs2_seed());
+    shuffle(rd_vec.begin(),  rd_vec.end(),  rd_mt);
+    shuffle(rs1_vec.begin(), rs1_vec.end(), rs1_mt);
+    shuffle(rs2_vec.begin(), rs2_vec.end(), rs2_mt);
 
+    for(auto it = _instructions.begin(); it != _instructions.end(); it++){
         /*
             * Each test will be made like this :
                 li rs1, random_value
@@ -146,16 +156,6 @@ _start :
        ofstream file;
        int number_of_tests = 0;
        int number_of_file = 0;
-       // This allow to randomise the combinaison of registers
-       random_device rd_seed;
-       random_device rs1_seed;
-       random_device rs2_seed;
-       mt19937 rd_mt (rd_seed());
-       mt19937 rs1_mt(rs1_seed());
-       mt19937 rs2_mt(rs2_seed());
-       shuffle(rd_vec.begin(),  rd_vec.end(),  rd_mt);
-       shuffle(rs1_vec.begin(), rs1_vec.end(), rs1_mt);
-       shuffle(rs2_vec.begin(), rs2_vec.end(), rs2_mt);
 
         switch(it->getType()){
             case R_type :
@@ -226,10 +226,13 @@ _start :
 
                 }
                 else{
-                    for (int rd = 0; rd < 32; rd++){
-                        for(int rs1 = 0; rs1 < 32; rs1 ++){
-                            for(int rs2 = 0; rs2 < 32; rs2 ++)
+                    for (auto rd_it = rd_vec.begin(); rd_it != rd_vec.end(); rd_it++){
+                        for(auto rs1_it = rs1_vec.begin(); rs1_it != rs1_vec.end(); rs1_it++){
+                            for(auto rs2_it = rs2_vec.begin(); rs2_it != rs2_vec.end(); rs2_it++)
                             {
+                                int rd = *rd_it;
+                                int rs1 = *rs1_it;
+                                int rs2 = *rs2_it;
                                 // FILE NAME GESTION
                                 if(number_of_tests % _number_test_per_file == 0){
                                     if(number_of_file != 0){

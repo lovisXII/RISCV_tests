@@ -15,7 +15,7 @@ OBJ_FILES := $(patsubst $(SRC_DIR)%.cpp,$(BUILD_DIR)%.o,$(SRC_FILES))
 CXX := clang++
 CXXFLAGS := -g -I$(INCLUDE_DIR)
 
-NUMBER_FILES := 100
+NUMBER_FILES := 10
 NUMBER_TESTS := 2
 
 .PHONY: all run compile clean
